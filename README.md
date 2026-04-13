@@ -271,3 +271,11 @@ Anti-detection патч держится ~12 req/min — в 5 раз ниже л
 2. OpenClaw → `http://qwen-mcp:9988/sse`
 3. MCP трафик локальный, не через интернет
 4. OpenClaw идёт через VPN, qwen-mcp через сервер
+
+### OpenClaw: максимальные права
+
+OpenClaw агент настроен с полным доступом:
+- Sandbox: `off` (без песочницы)
+- Tools: `group:openclaw` (все инструменты, без deny)
+- Elevated: `enabled` (из webchat, CLI, API)
+- Thinking: `high`
