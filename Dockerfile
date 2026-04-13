@@ -7,6 +7,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     openssh-client \
     python3 \
     ca-certificates \
+    procps \
     && rm -rf /var/lib/apt/lists/*
 
 # Install pinned versions of all packages
@@ -33,12 +34,15 @@ WORKDIR /workspace
 # Run as non-root user
 USER node
 
+# Ensure npm global bin is in PATH
+ENV PATH=/usr/local/bin:$PATH
+
 # Expose MCP server port
 EXPOSE 9988
 
-# Health check
+# Health check via pgrep (avoids SSE transport conflict)
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
-    CMD curl -sf http://localhost:9988/sse > /dev/null 2>&1 || exit 1
+    CMD pgrep -f supergateway || exit 1
 
-# Run supergateway with qwen-mcp-tool (use explicit paths, not npx)
-CMD ["sh", "-c", "supergateway --stdio 'qwen-mcp-tool' --port 9988 --host 0.0.0.0"]
+# Run supergateway with qwen-mcp-tool via node (avoids PATH issues in child process)
+CMD ["sh", "-c", "supergateway --stdio 'node /usr/local/lib/node_modules/qwen-mcp-tool/dist/index.js' --port 9988 --host 0.0.0.0"]
