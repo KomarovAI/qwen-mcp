@@ -1,14 +1,27 @@
 #!/bin/bash
 # Anti-detection patch: inject human-like delay into qwen-mcp-tool
+set -e
 
 TARGET="/usr/local/lib/node_modules/qwen-mcp-tool/dist/tools/ask-qwen.tool.js"
 
-# Write the patched file using cat with heredoc (avoids encoding issues)
+# Validate target exists
+if [ ! -f "$TARGET" ]; then
+    echo "✗ ERROR: Target file not found: $TARGET"
+    echo "  qwen-mcp-tool version may have changed. Check npm package version."
+    exit 1
+fi
+
+# Write the patched file using cat with heredoc
 cat > "$TARGET" << 'PATCHED_EOF'
 import { z } from 'zod';
 import { executeQwenCLI, processChangeModeOutput } from '../utils/qwenExecutor.js';
 import { ERROR_MESSAGES, STATUS_MESSAGES } from '../constants.js';
 
+/**
+ * Human-like delay with uniform random jitter (2-8 seconds).
+ * Prevents pattern-based bot detection by introducing variable pauses.
+ * Average ~5s delay = ~12 req/min (well within Qwen's 60 req/min limit).
+ */
 function humanDelay() {
     const minDelay = 2000;
     const maxDelay = 8000;
@@ -41,14 +54,30 @@ export const askQwenTool = {
         if (changeMode && chunkIndex && chunkCacheKey) {
             return processChangeModeOutput('', chunkIndex, chunkCacheKey, prompt);
         }
-        await humanDelay();
-        const result = await executeQwenCLI(prompt, model, !!sandbox, !!changeMode, onProgress);
-        if (changeMode) {
-            return processChangeModeOutput(result, args.chunkIndex, undefined, prompt);
+        try {
+            // Human-like delay to prevent bot detection
+            await humanDelay();
+            const result = await executeQwenCLI(prompt, model, !!sandbox, !!changeMode, onProgress);
+            if (changeMode) {
+                return processChangeModeOutput(result, args.chunkIndex, undefined, prompt);
+            }
+            return STATUS_MESSAGES.QWEN_RESPONSE + "\n" + result;
+        } catch (err) {
+            throw new Error(`ask-qwen execution failed: ${err.message}`);
         }
-        return STATUS_MESSAGES.QWEN_RESPONSE + "\n" + result;
     }
 };
 PATCHED_EOF
 
-echo "Patched: $TARGET"
+# Validate patch was applied
+if ! grep -q "humanDelay" "$TARGET"; then
+    echo "✗ ERROR: Patch validation failed — humanDelay not found in patched file"
+    exit 1
+fi
+
+if ! grep -q "execution failed:" "$TARGET"; then
+    echo "✗ ERROR: Error handling patch not applied"
+    exit 1
+fi
+
+echo "✓ Anti-detection patch applied and validated: $TARGET"

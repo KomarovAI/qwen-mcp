@@ -4,8 +4,9 @@ services:
     container_name: qwen-mcp
     restart: unless-stopped
     ports:
-      # MCP сервер (supergateway → qwen-mcp-tool)
-      - "9988:9988"
+      # MCP сервер — привязан к localhost (без авторизации!)
+      # Для доступа из других контейнеров — использовать Docker сеть
+      - "127.0.0.1:9988:9988"
     volumes:
       # Персистентная конфигурация Qwen
       - qwen-config:/root/.qwen
@@ -18,15 +19,31 @@ services:
       - HTTPS_PROXY=http://host.docker.internal:8121
       - http_proxy=http://host.docker.internal:8121
       - https_proxy=http://host.docker.internal:8121
-      - NO_PROXY=localhost,127.0.0.1,host.docker.internal,172.16.0.0/12
-      - no_proxy=localhost,127.0.0.1,host.docker.internal,172.16.0.0/12
-      # Секреты — передать через .env файл или docker secrets
+      # Локальные адреса идут напрямую, не через прокси
+      - NO_PROXY=localhost,127.0.0.1,host.docker.internal,*.local,*.internal,docker.for.*,169.254.169.254
+      - no_proxy=localhost,127.0.0.1,host.docker.internal,*.local,*.internal,docker.for.*,169.254.169.254
+      # Секреты — передать через .env файл
       - HUGGING_FACE_HUB_TOKEN=${HUGGING_FACE_HUB_TOKEN}
       - PEXELS_API_KEY=${PEXELS_API_KEY}
       - PIXABAY_API_KEY=${PIXABAY_API_KEY}
       - UNSPLASH_ACCESS_KEY=${UNSPLASH_ACCESS_KEY}
     extra_hosts:
       - "host.docker.internal:host-gateway"
+    # Resource limits
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+          cpus: '1.0'
+        reservations:
+          memory: 256M
+          cpus: '0.25'
+    # Logging limits
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
 
 volumes:
   qwen-config:
