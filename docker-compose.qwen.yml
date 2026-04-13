@@ -1,0 +1,33 @@
+services:
+  qwen-mcp:
+    build: .
+    container_name: qwen-mcp
+    restart: unless-stopped
+    ports:
+      # MCP сервер (supergateway → qwen-mcp-tool)
+      - "9988:9988"
+    volumes:
+      # Персистентная конфигурация Qwen
+      - qwen-config:/root/.qwen
+      # Кэш NPM
+      - npm-cache:/root/.npm
+    environment:
+      - NODE_ENV=production
+      # Прямой HTTP прокси → SSH туннель на хосте (порт 8121) → сервер 185.232.169.53
+      - HTTP_PROXY=http://host.docker.internal:8121
+      - HTTPS_PROXY=http://host.docker.internal:8121
+      - http_proxy=http://host.docker.internal:8121
+      - https_proxy=http://host.docker.internal:8121
+      - NO_PROXY=localhost,127.0.0.1,host.docker.internal,172.16.0.0/12
+      - no_proxy=localhost,127.0.0.1,host.docker.internal,172.16.0.0/12
+      # Секреты — передать через .env файл или docker secrets
+      - HUGGING_FACE_HUB_TOKEN=${HUGGING_FACE_HUB_TOKEN}
+      - PEXELS_API_KEY=${PEXELS_API_KEY}
+      - PIXABAY_API_KEY=${PIXABAY_API_KEY}
+      - UNSPLASH_ACCESS_KEY=${UNSPLASH_ACCESS_KEY}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+volumes:
+  qwen-config:
+  npm-cache:
